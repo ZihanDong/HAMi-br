@@ -1,0 +1,16 @@
+# Request quarter-GPU Biren SVI instances (~16GB each on a 166C).
+# The node must have one or more GPUs in SVI MODE2 (`brsmi gpu set -s 2 -i <id>`),
+# which the device plugin advertises as birentech.com/1-4-gpu.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: biren-svi-quarter
+spec:
+  restartPolicy: Never
+  containers:
+    - name: app
+      image: ubuntu:22.04
+      command: ["sh", "-c", "echo BR_PHY_CARDS=$BR_PHY_CARDS && sleep 3600"]
+      resources:
+        limits:
+          birentech.com/1-4-gpu: "2"   # two quarter-GPU SVI instances

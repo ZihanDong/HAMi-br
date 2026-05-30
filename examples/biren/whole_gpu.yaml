@@ -1,0 +1,15 @@
+# Request whole (un-partitioned) Biren GPUs.
+# The node's GPUs must have SVI disabled (`brsmi gpu set -s 0 -i <id>`).
+apiVersion: v1
+kind: Pod
+metadata:
+  name: biren-whole-gpu
+spec:
+  restartPolicy: Never
+  containers:
+    - name: app
+      image: ubuntu:22.04
+      command: ["sh", "-c", "echo BR_PHY_CARDS=$BR_PHY_CARDS && sleep 3600"]
+      resources:
+        limits:
+          birentech.com/gpu: "1"        # one whole GPU instance

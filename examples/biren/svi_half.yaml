@@ -1,0 +1,20 @@
+# Request a half-GPU Biren SVI instance (~32GB on a 166C).
+# The node must have one or more GPUs in SVI MODE1 (`brsmi gpu set -s 1 -i <id>`),
+# which the device plugin advertises as birentech.com/1-2-gpu.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: biren-svi-half
+spec:
+  restartPolicy: Never
+  containers:
+    - name: app
+      image: ubuntu:22.04
+      command: ["sh", "-c", "echo BR_PHY_CARDS=$BR_PHY_CARDS && sleep 3600"]
+      resources:
+        limits:
+          birentech.com/1-2-gpu: "1"          # one half-GPU SVI instance
+          # Optional minimum per-instance memory filter (MiB). Memory is fixed
+          # by the SVI mode and never oversubscribed; this only filters which
+          # instances are eligible:
+          birentech.com/1-2-gpumem: "30000"

@@ -30,6 +30,7 @@ import (
 	"github.com/Project-HAMi/HAMi/pkg/device/amd"
 	"github.com/Project-HAMi/HAMi/pkg/device/ascend"
 	"github.com/Project-HAMi/HAMi/pkg/device/awsneuron"
+	"github.com/Project-HAMi/HAMi/pkg/device/biren"
 	"github.com/Project-HAMi/HAMi/pkg/device/cambricon"
 	"github.com/Project-HAMi/HAMi/pkg/device/enflame"
 	"github.com/Project-HAMi/HAMi/pkg/device/hygon"
@@ -85,6 +86,7 @@ type Config struct {
 	AMDGPUConfig    amd.AMDConfig             `yaml:"amd"`
 	VastaiConfig    vastai.VastaiConfig       `yaml:"vastai"`
 	VNPUs           ascend.VNPUs              `yaml:"vnpus"`
+	BirenConfig     biren.BirenConfigs        `yaml:"biren"`
 }
 
 var (
@@ -241,6 +243,14 @@ func InitDevicesWithConfig(config *Config) error {
 		klog.Infof("Iluvatar device %s initialized", commonWord)
 	}
 
+	// Initialize Biren SVI devices
+	for _, dev := range biren.InitBirenDevices(config.BirenConfig) {
+		commonWord := dev.CommonWord()
+		device.DevicesMap[commonWord] = dev
+		device.DevicesToHandle = append(device.DevicesToHandle, commonWord)
+		klog.Infof("Biren device %s initialized", commonWord)
+	}
+
 	if len(initErrors) > 0 {
 		return fmt.Errorf("errors occurred during initialization: %v", initErrors)
 	}
@@ -261,7 +271,8 @@ func validateConfig(config *Config) error {
 		!reflect.DeepEqual(config.AWSNeuronConfig, awsneuron.AWSNeuronConfig{}) ||
 		!reflect.DeepEqual(config.EnflameConfig, enflame.EnflameConfig{}) ||
 		!reflect.DeepEqual(config.AMDGPUConfig, amd.AMDConfig{}) ||
-		len(config.VNPUs.Configs) > 0 {
+		len(config.VNPUs.Configs) > 0 ||
+		len(config.BirenConfig.Configs) > 0 {
 		return nil
 	}
 	return fmt.Errorf("all configurations are empty")
@@ -340,6 +351,20 @@ awsneuron:
   resourceCoreName: "aws.amazon.com/neuroncore"
 amd:
   resourceCountName: "amd.com/gpu"
+biren:
+  configs:
+  - chipName: "Biren166C"
+    commonWord: "BirenGPU"
+    resourceCountName: "birentech.com/gpu"
+    resourceMemoryName: "birentech.com/gpumem"
+  - chipName: "Biren166C"
+    commonWord: "Biren-1of2"
+    resourceCountName: "birentech.com/1-2-gpu"
+    resourceMemoryName: "birentech.com/1-2-gpumem"
+  - chipName: "Biren166C"
+    commonWord: "Biren-1of4"
+    resourceCountName: "birentech.com/1-4-gpu"
+    resourceMemoryName: "birentech.com/1-4-gpumem"
 vnpus:
   hamiVnpuCore: false
   configs:
@@ -464,6 +489,7 @@ func GlobalFlagSet() *flag.FlagSet {
 	enflame.ParseConfig(fs)
 	metax.ParseConfig(fs)
 	kunlun.ParseConfig(fs)
+	biren.ParseConfig(fs)
 	fs.BoolVar(&DebugMode, "debug", false, "Enable debug mode")
 	fs.StringVar(&configFile, "device-config-file", "", "Path to the device config file")
 	klog.InitFlags(fs)
