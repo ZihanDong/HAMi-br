@@ -255,5 +255,11 @@ Returns a YAML list that can be used directly or converted to JSON via fromYaml 
 {{- range .Values.devices.amd.customresources -}}
 {{- $resources = append $resources (dict "name" . "ignoredByScheduler" true) -}}
 {{- end -}}
+{{/* Biren SVI resources */}}
+{{- if .Values.devices.biren.enabled -}}
+{{- range .Values.devices.biren.customresources -}}
+{{- $resources = append $resources (dict "name" . "ignoredByScheduler" true) -}}
+{{- end -}}
+{{- end -}}
 {{- toYaml $resources -}}
 {{- end -}}

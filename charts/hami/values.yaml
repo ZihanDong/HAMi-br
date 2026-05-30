@@ -521,6 +521,20 @@ devices:
       - iluvatar.ai/MR-V50-vgpu
       - iluvatar.ai/MR-V50.vCore
       - iluvatar.ai/MR-V50.vMem
+  biren:
+    # Biren SVI (hardware-partitioned) GPU support. When enabled, the scheduler
+    # is started with --enable-biren and these resources trigger the HAMi
+    # extender. Allocation/device-injection is handled by Biren's own device
+    # plugin; HAMi performs whole-instance (exclusive) scheduling.
+    enabled: false
+    runtimeClassName: "biren"  # applied to pods requesting Biren resources (only when the admission webhook is enabled)
+    customresources:
+      - birentech.com/gpu
+      - birentech.com/gpumem
+      - birentech.com/1-2-gpu
+      - birentech.com/1-2-gpumem
+      - birentech.com/1-4-gpu
+      - birentech.com/1-4-gpumem
 
 legacyMetrics: false
 

@@ -286,6 +286,23 @@ data:
       resourceCountName: "amd.com/gpu"
     vastai:
       resourceCountName: {{ .Values.vastaiResourceName }}
+    biren:
+      configs:
+      - chipName: "Biren166"
+        commonWord: "BirenGPU"
+        resourceCountName: "birentech.com/gpu"
+        resourceMemoryName: "birentech.com/gpumem"
+        runtimeClassName: "{{ .Values.devices.biren.runtimeClassName | default "biren" }}"
+      - chipName: "Biren166"
+        commonWord: "Biren-1of2"
+        resourceCountName: "birentech.com/1-2-gpu"
+        resourceMemoryName: "birentech.com/1-2-gpumem"
+        runtimeClassName: "{{ .Values.devices.biren.runtimeClassName | default "biren" }}"
+      - chipName: "Biren166"
+        commonWord: "Biren-1of4"
+        resourceCountName: "birentech.com/1-4-gpu"
+        resourceMemoryName: "birentech.com/1-4-gpumem"
+        runtimeClassName: "{{ .Values.devices.biren.runtimeClassName | default "biren" }}"
     vnpus:
       hamiVnpuCore: {{ .Values.devices.ascend.hamiVnpuCore | default false }}
       configs:
