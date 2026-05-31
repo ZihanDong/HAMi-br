@@ -58,8 +58,11 @@ fi
 
 PKG_NAME="hami-br-svi-${VERSION}"
 STAGE="${OUT_DIR}/${PKG_NAME}"
-ksreg="${KUBE_SCHEDULER_IMAGE%:*}"; kstag="${KUBE_SCHEDULER_IMAGE##*:}"
-extreg="${HAMI_IMAGE%/*/*}"; extrepo="$(echo "${HAMI_IMAGE#*/}" | cut -d: -f1)"; exttag="${HAMI_IMAGE##*:}"
+# Split <registry>/<repository>:<tag> for both images.
+kstag="${KUBE_SCHEDULER_IMAGE##*:}"; _kspath="${KUBE_SCHEDULER_IMAGE%:*}"
+ksrepo="${_kspath##*/}"; ksreg="${_kspath%/*}"
+exttag="${HAMI_IMAGE##*:}"; _extpath="${HAMI_IMAGE%:*}"
+extreg="${_extpath%%/*}"; extrepo="${_extpath#*/}"
 
 rm -rf "$STAGE"; mkdir -p "$STAGE"
 info "packaging ${PKG_NAME}  (image ${HAMI_IMAGE})"
@@ -79,7 +82,7 @@ info "rendering hami-scheduler.yaml via helm template (kube ${KUBE_VERSION})"
   --set scheduler.admissionWebhook.enabled=false \
   --set devicePlugin.enabled=false \
   --set scheduler.kubeScheduler.image.registry="$ksreg" \
-  --set scheduler.kubeScheduler.image.repository=kube-scheduler \
+  --set scheduler.kubeScheduler.image.repository="$ksrepo" \
   --set scheduler.kubeScheduler.image.tag="$kstag" \
   --set scheduler.kubeScheduler.image.pullPolicy=IfNotPresent \
   --set scheduler.extender.image.registry="$extreg" \
