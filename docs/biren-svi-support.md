@@ -148,6 +148,22 @@ Use `birentech.com/gpu` (whole), `birentech.com/1-2-gpu` (half) or
 `birentech.com/1-4-gpu` (quarter). The pod gets `BR_PHY_CARDS=card_N` and
 `/dev/biren/card_N`.
 
+## Operational notes
+
+- **Concurrent scheduling / no node-bind mutex.** HAMi's per-node bind mutex
+  (`hami.io/mutex.lock`) is held by the scheduler's Bind and normally released
+  by HAMi's *own* device plugin during Allocate. Biren SVI uses the vendor
+  device plugin (not HAMi-aware), so the Biren backend's `LockNode` is a no-op —
+  otherwise the lock would linger for its 5-min TTL and serialize SVI pods one
+  at a time. This is safe here: SVI instances are exclusive, kube-scheduler
+  invokes Filter sequentially, and the kubelet's extended-resource count plus
+  the vendor plugin prevent double-allocation.
+- **After restarting the scheduler**, re-publish the node registration (step 3)
+  — clear any stale `hami.io/node-handshake-*` node annotations so the
+  registration loop re-ingests the devices. A restarted scheduler with a
+  lingering `Requesting_<old>` handshake will otherwise report the node as
+  "unregistered" and pods stay Pending.
+
 ## Verifying
 
 A pod scheduled by HAMi carries `hami.io/<commonWord>-devices-allocated` and

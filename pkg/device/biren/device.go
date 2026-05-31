@@ -25,7 +25,6 @@ import (
 	"github.com/Project-HAMi/HAMi/pkg/device"
 	"github.com/Project-HAMi/HAMi/pkg/device/common"
 	"github.com/Project-HAMi/HAMi/pkg/util"
-	"github.com/Project-HAMi/HAMi/pkg/util/nodelock"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/klog/v2"
@@ -139,27 +138,24 @@ func (dev *BirenDevices) PatchAnnotations(pod *corev1.Pod, annoinput *map[string
 	return *annoinput
 }
 
+// LockNode is intentionally a no-op for Biren SVI.
+//
+// HAMi's per-node bind mutex (hami.io/mutex.lock) is held by the scheduler's
+// Bind on success and is meant to be released by HAMi's OWN device plugin
+// during Allocate. Biren SVI uses the vendor device plugin (which is not
+// HAMi-aware and never releases the lock), so holding it would serialize all
+// binds on the node for the full lock TTL (5m), blocking a second SVI pod.
+//
+// The lock is unnecessary here: SVI instances are whole, exclusive devices;
+// kube-scheduler invokes Filter sequentially (so instance selection, recorded
+// in the scheduler's podManager during Filter, never races), and the kubelet's
+// extended-resource accounting plus the vendor plugin prevent double-allocation.
 func (dev *BirenDevices) LockNode(n *corev1.Node, p *corev1.Pod) error {
-	if !dev.podHasRequest(p) {
-		return nil
-	}
-	return nodelock.LockNode(n.Name, BirenNodeLock, p)
+	return nil
 }
 
 func (dev *BirenDevices) ReleaseNodeLock(n *corev1.Node, p *corev1.Pod) error {
-	if !dev.podHasRequest(p) {
-		return nil
-	}
-	return nodelock.ReleaseNodeLock(n.Name, BirenNodeLock, p, false)
-}
-
-func (dev *BirenDevices) podHasRequest(p *corev1.Pod) bool {
-	for i := range p.Spec.Containers {
-		if dev.GenerateResourceRequests(&p.Spec.Containers[i]).Nums > 0 {
-			return true
-		}
-	}
-	return false
+	return nil
 }
 
 func (dev *BirenDevices) NodeCleanUp(nn string) error {
