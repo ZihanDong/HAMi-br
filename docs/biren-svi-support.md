@@ -164,6 +164,29 @@ Use `birentech.com/gpu` (whole), `birentech.com/1-2-gpu` (half) or
   lingering `Requesting_<old>` handshake will otherwise report the node as
   "unregistered" and pods stay Pending.
 
+## Dynamic SVI / auto-reclaim (optional)
+
+By default SVI partitioning is **static**: `brsmi gpu set -s` is a persistent
+hardware setting and the HAMi backend only schedules pre-existing instances, so
+a partitioned-but-idle GPU does **not** revert to a whole card on its own (this
+is expected — nothing in standard HAMi reconciles hardware partitioning except
+NVIDIA dynamic-MIG).
+
+`cmd/biren-svi-manager` is an optional per-node controller (privileged DaemonSet,
+runs `brsmi`) that makes it dynamic. Enable with
+`--set devices.biren.dynamicSVI=true` (and package it by building
+`bin/biren-svi-manager` before `hack/package-hami-svi.sh`):
+
+- **reclaim** (default on): when the node has no vGPU occupancy, an idle
+  partitioned GPU is reverted to a whole card after `graceCycles`. Occupancy is
+  the count of vGPU pod requests on the node, so a GPU in use is never reclaimed.
+- **provision** (default OFF, experimental): partition an idle whole GPU on
+  unmet demand. The vendor device plugin does not reliably re-advertise after a
+  live mode change and the HAMi scheduler does not evict stale devices, so the
+  manager restarts both after a change — workable for reclaim, but on-demand
+  provisioning is not yet stable and needs deeper integration. Pre-partition
+  GPUs for vGPU capacity.
+
 ## Verifying
 
 A pod scheduled by HAMi carries `hami.io/<commonWord>-devices-allocated` and

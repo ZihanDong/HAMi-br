@@ -1,0 +1,123 @@
+{{- if and .Values.devices.biren.enabled .Values.devices.biren.dynamicSVI (not .Values.dra.enabled) }}
+# biren-svi-manager: per-node controller that makes Biren SVI partitioning
+# dynamic — reclaims idle partitioned GPUs to whole cards and partitions idle
+# whole GPUs on unmet vGPU demand (runs `brsmi gpu set -s`). Privileged, host
+# brsmi/lib mounts. Without it SVI mode is static and never auto-recovers.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: biren-svi-manager
+  namespace: {{ include "hami-vgpu.namespace" . }}
+  labels:
+    app.kubernetes.io/component: biren-svi-manager
+    {{- include "hami-vgpu.labels" . | nindent 4 }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: biren-svi-manager
+  labels:
+    app.kubernetes.io/component: biren-svi-manager
+    {{- include "hami-vgpu.labels" . | nindent 4 }}
+rules:
+- apiGroups: [""]
+  resources: ["nodes", "pods"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: [""]
+  resources: ["nodes"]
+  verbs: ["patch", "update"]
+# restart the vendor device-plugin pod after a mode change to force re-advertise
+- apiGroups: [""]
+  resources: ["pods"]
+  verbs: ["delete"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: biren-svi-manager
+  labels:
+    app.kubernetes.io/component: biren-svi-manager
+    {{- include "hami-vgpu.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: biren-svi-manager
+subjects:
+- kind: ServiceAccount
+  name: biren-svi-manager
+  namespace: {{ include "hami-vgpu.namespace" . }}
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: biren-svi-manager
+  namespace: {{ include "hami-vgpu.namespace" . }}
+  labels:
+    app.kubernetes.io/component: biren-svi-manager
+    {{- include "hami-vgpu.labels" . | nindent 4 }}
+spec:
+  selector:
+    matchLabels:
+      app: biren-svi-manager
+  template:
+    metadata:
+      labels:
+        app: biren-svi-manager
+        hami.io/webhook: ignore
+    spec:
+      serviceAccountName: biren-svi-manager
+      priorityClassName: system-node-critical
+      nodeSelector:
+        birentech.com: gpu
+      tolerations:
+      - operator: Exists
+      containers:
+      - name: manager
+        image: {{ include "hami.scheduler.extender.image" . }}
+        imagePullPolicy: {{ .Values.scheduler.extender.image.pullPolicy }}
+        command: ["biren-svi-manager"]
+        args: ["-v=3", "--logtostderr=true"]
+        env:
+        - name: NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+        - name: BRSMI
+          value: /opt/birentech/bin/brsmi
+        - name: LD_LIBRARY_PATH
+          value: /opt/birentech/lib
+        - name: INTERVAL_SECONDS
+          value: "{{ .Values.devices.biren.manager.intervalSeconds }}"
+        - name: GRACE_CYCLES
+          value: "{{ .Values.devices.biren.manager.graceCycles }}"
+        - name: ENABLE_PROVISION
+          value: "{{ .Values.devices.biren.manager.enableProvision }}"
+        - name: ENABLE_RECLAIM
+          value: "{{ .Values.devices.biren.manager.enableReclaim }}"
+        securityContext:
+          privileged: true
+        volumeMounts:
+        - name: brsmi
+          mountPath: /opt/birentech/bin
+          readOnly: true
+        - name: brml
+          mountPath: /opt/birentech/lib
+          readOnly: true
+        - name: dev
+          mountPath: /dev
+        - name: sys
+          mountPath: /sys   # writable: `brsmi gpu set -s` writes SVI mode via sysfs
+      volumes:
+      - name: brsmi
+        hostPath:
+          path: {{ .Values.devices.biren.brsmiBinPath }}
+      - name: brml
+        hostPath:
+          path: {{ .Values.devices.biren.driverLibPath }}
+      - name: dev
+        hostPath:
+          path: /dev
+      - name: sys
+        hostPath:
+          path: /sys
+{{- end }}

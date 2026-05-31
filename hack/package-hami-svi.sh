@@ -34,6 +34,7 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 CHART="${REPO_ROOT}/charts/hami"
 
 SCHED_BIN="${SCHED_BIN:-${REPO_ROOT}/bin/scheduler}"
+MANAGER_BIN="${MANAGER_BIN:-${REPO_ROOT}/bin/biren-svi-manager}"  # optional; enables dynamic SVI
 VERSION="${VERSION:-$( [ -f "${REPO_ROOT}/VERSION" ] && cat "${REPO_ROOT}/VERSION" || echo dev )}"
 HAMI_IMAGE="${HAMI_IMAGE:-10.50.36.126:32000/hami/hami:biren-svi}"
 BASE_IMAGE="${BASE_IMAGE:-ubuntu:24.04}"
@@ -67,10 +68,18 @@ extreg="${_extpath%%/*}"; extrepo="${_extpath#*/}"
 rm -rf "$STAGE"; mkdir -p "$STAGE"
 info "packaging ${PKG_NAME}  (image ${HAMI_IMAGE})"
 
-# 1) image tar (base + scheduler binary at /usr/local/bin/scheduler), daemonless
+# 1) image tar (base + scheduler [+ biren-svi-manager] at /usr/local/bin), daemonless
 info "building image tar via crane"
+DYNAMIC_SVI=false
 tmp="$(mktemp -d)"; mkdir -p "$tmp/root/usr/local/bin"
 install -m0755 "$SCHED_BIN" "$tmp/root/usr/local/bin/scheduler"
+if [ -x "$MANAGER_BIN" ]; then
+  install -m0755 "$MANAGER_BIN" "$tmp/root/usr/local/bin/biren-svi-manager"
+  DYNAMIC_SVI=true
+  info "including biren-svi-manager (dynamic SVI enabled)"
+else
+  info "biren-svi-manager not found at $MANAGER_BIN; packaging static SVI only"
+fi
 tar -C "$tmp/root" -cf "$tmp/layer.tar" usr
 "$CRANE" append -b "$BASE_IMAGE" -f "$tmp/layer.tar" -t "$HAMI_IMAGE" -o "$STAGE/hami-svi.tar" --insecure
 rm -rf "$tmp"
@@ -79,6 +88,7 @@ rm -rf "$tmp"
 info "rendering hami-scheduler.yaml via helm template (kube ${KUBE_VERSION})"
 "$HELM" template hami "$CHART" -n hami-system --kube-version "$KUBE_VERSION" \
   --set devices.biren.enabled=true \
+  --set devices.biren.dynamicSVI="${DYNAMIC_SVI}" \
   --set scheduler.admissionWebhook.enabled=false \
   --set devicePlugin.enabled=false \
   --set scheduler.kubeScheduler.image.registry="$ksreg" \

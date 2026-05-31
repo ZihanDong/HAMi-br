@@ -528,6 +528,25 @@ devices:
     # plugin; HAMi performs whole-instance (exclusive) scheduling.
     enabled: false
     runtimeClassName: "biren"  # applied to pods requesting Biren resources (only when the admission webhook is enabled)
+    # Dynamic SVI: deploy the biren-svi-manager DaemonSet (privileged, runs brsmi)
+    # which reverts idle partitioned GPUs to whole cards and partitions idle whole
+    # GPUs on unmet vGPU demand. Without it, SVI mode is a static, admin-managed
+    # setting and never auto-recovers.
+    dynamicSVI: false
+    driverLibPath: /usr/local/birensupa/driver/biren-smi/lib   # host libbiren-ml.so dir
+    brsmiBinPath: /usr/local/birensupa/driver/biren-smi/bin     # host brsmi dir
+    manager:
+      intervalSeconds: 20
+      graceCycles: 2
+      # reclaim: revert idle partitioned GPUs to whole cards when there is no
+      # vGPU occupancy (validated). This is the supported direction.
+      enableReclaim: true
+      # provision: partition an idle whole GPU on unmet vGPU demand. EXPERIMENTAL
+      # and off by default — the vendor device plugin does not reliably
+      # re-advertise and the HAMi scheduler does not evict stale devices, so
+      # on-demand provisioning needs deeper integration to be stable. Admins
+      # should pre-partition GPUs (brsmi / set-node-mode) for vGPU capacity.
+      enableProvision: false
     customresources:
       - birentech.com/gpu
       - birentech.com/gpumem
