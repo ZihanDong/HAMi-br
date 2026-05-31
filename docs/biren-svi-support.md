@@ -187,6 +187,35 @@ runs `brsmi`) that makes it dynamic. Enable with
   provisioning is not yet stable and needs deeper integration. Pre-partition
   GPUs for vGPU capacity.
 
+### Testing auto-reclaim
+
+The companion repo provides a one-command test
+(`br-release/setup/kubernets/tests/vgpu-reclaim-test.sh`):
+
+```bash
+sudo ./vgpu-reclaim-test.sh [--flavor half|quarter] [--gpu <index>]
+```
+
+It (1) stops the manager so setup is not auto-reclaimed, (2) partitions an idle
+whole GPU and refreshes the device plugin, (3) registers the SVI devices and the
+scheduler, (4) runs a vGPU task on the new instance, (5) restarts the manager and
+checks the GPU stays partitioned **while occupied**, then (6) deletes the task
+and asserts the GPU **auto-reverts to a whole card**. Expected tail:
+
+```
+[OK] GPU <n> still Enabled while task runs (occupancy prevents reclaim)
+[OK] GPU <n> AUTO-RECOVERED to a whole card after task release
+[OK] RECLAIM TEST PASSED
+```
+
+Manual equivalent: with a task already running on a partitioned GPU, delete it
+and watch `brsmi gpu --query-gpu=index,svi.mode.current --format=csv,noheader`
+— the GPU's mode flips `Enabled` → `Disabled` within ~1 min once no vGPU pod
+occupies it. (Setup stops the manager first because it would otherwise reclaim
+the freshly-partitioned GPU before a task can land on it; the vendor device
+plugin's advertise also oscillates briefly after a mode change, so the test
+waits for a stable count and retries.)
+
 ## Verifying
 
 A pod scheduled by HAMi carries `hami.io/<commonWord>-devices-allocated` and
